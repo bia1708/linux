@@ -21,7 +21,7 @@ jobs:
     steps:
       - checkout: none
       - script: |
-          echo "hello"
+          echo "${variables['x']}"
 # - job: sync_branches_with_main
 #   condition: and(ne(variables['Build.Reason'], 'PullRequest'), eq(variables.isMain, true))
 #   variables:

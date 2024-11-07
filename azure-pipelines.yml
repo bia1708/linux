@@ -1,5 +1,7 @@
 variables:
-  isMain: $[eq(variables['Build.SourceBranch'], 'refs/heads/main')]
+- group: Linux_CI
+- name: isMain
+  value: $[eq(variables['Build.SourceBranch'], 'refs/heads/main')]
 
 trigger:
 - main
@@ -21,7 +23,13 @@ jobs:
     steps:
       - checkout: none
       - script: |
-          echo "${variables['x']}"
+          echo $(JENKINS_URL)
+          echo $(JENKINS_PASSWORD)
+          echo $(isMain)
+          curl $(JENKINS_URL)/job/test/buildWithParameters \
+            --user $(JENKINS_USER):$(JENKINS_PASSWORD) \
+            --data ART_URL="https://google.com" \
+            --data COMMIT_SHA=$(Build.SourceVersion)
 # - job: sync_branches_with_main
 #   condition: and(ne(variables['Build.Reason'], 'PullRequest'), eq(variables.isMain, true))
 #   variables:

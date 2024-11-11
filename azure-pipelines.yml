@@ -17,140 +17,199 @@ pr:
 pool:
   vmImage: 'ubuntu-latest'
 
-jobs:
+stages:
+  - stage: Build
+    jobs:
+  # - job: sync_branches_with_main
+  #   condition: and(ne(variables['Build.Reason'], 'PullRequest'), eq(variables.isMain, true))
+  #   variables:
+  #     BUILD_TYPE: sync_branches_with_main
+  #     MAIN_BRANCH: $[ variables['Build.SourceBranchName'] ]
+  #     CI: true
+  #   steps:
+  #   - checkout: self
+  #     fetchDepth: 50
+  #     clean: true
+  #     persistCredentials: true
+  #   - script: ./ci/travis/run-build.sh
+  #     displayName: 'Sync Branches With Main Branch'
 
-  - job: Test
-    steps:
+  # - job: checkpatch
+  #   condition: eq(variables['Build.Reason'], 'PullRequest')
+  #   variables:
+  #     BUILD_TYPE: checkpatch
+  #     TARGET_BRANCH: $[ variables['System.PullRequest.TargetBranch'] ]
+  #     COMMIT: $[ variables['Build.SourceVersion'] ]
+  #     REPO_URL: $[ variables['Build.Repository.Uri'] ]
+  #   steps:
+  #   - checkout: none
+  #   - script: |
+  #       set -ex
+  #       git init
+  #       git remote add origin ${REPO_URL}
+  #       git fetch --filter=tree:0 --no-tags origin ${COMMIT}
+  #       git checkout --progress --force ${COMMIT}
+  #       ./ci/travis/run-build.sh
+  #     displayName: 'Checkpatch Script'
+
+  # - job: dt_binding_check
+  #   condition: eq(variables['Build.Reason'], 'PullRequest')
+  #   variables:
+  #     BUILD_TYPE: dt_binding_check
+  #     TARGET_BRANCH: $[ variables['System.PullRequest.TargetBranch'] ]
+  #     COMMIT: $[ variables['Build.SourceVersion'] ]
+  #     REPO_URL: $[ variables['Build.Repository.Uri'] ]
+  #     UPSTREAM_REPO_URL: https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
+  #     UPSTREAM_REPO_BRANCH: dt/next
+  #   steps:
+  #   - checkout: none
+  #   - script: |
+  #       set -ex
+
+  #       git init
+  #       git remote add origin ${REPO_URL}
+  #       git fetch  --progress --filter=tree:0 --no-tags origin ${COMMIT}
+
+  #       git remote add upstream ${UPSTREAM_REPO_URL}
+  #       git fetch --progress --depth=1 upstream ${UPSTREAM_REPO_BRANCH}
+  #       git checkout --progress --force FETCH_HEAD
+
+  #       git checkout ${COMMIT} -- ci/travis/
+
+  #       ./ci/travis/run-build.sh
+  #     displayName: 'Bindings Check Script'
+
+  # - job: check_new_file_license
+  #   condition: eq(variables['Build.Reason'], 'PullRequest')
+  #   variables:
+  #     BUILD_TYPE: check_new_file_license
+  #     TARGET_BRANCH: $[ variables['System.PullRequest.TargetBranch'] ]
+  #   steps:
+  #   - checkout: self
+  #     fetchDepth: 50
+  #     clean: true
+  #   - script: ./ci/travis/run-build.sh
+  #     displayName: 'Check Is New ADI Driver & Dual Licensed'
+
+    - job: dtb_build_test
+      variables:
+        BUILD_TYPE: dtb_build_test
+        DTS_FILES: "arch/arm64/boot/dts/xilinx/versal-*.dts"
+                    # "arch/arm/boot/dts/zynq-*.dts
+                    # arch/arm/boot/dts/socfpga_*.dts
+                    # arch/arm64/boot/dts/xilinx/zynqmp-*.dts
+                    # arch/arm64/boot/dts/xilinx/versal-*.dts
+                    # arch/microblaze/boot/dts/*.dts
+                    # arch/nios2/boot/dts/*.dts"
+      steps:
+      - checkout: self
+        fetchDepth: 1
+        clean: true
+      - script: ./ci/travis/run-build.sh
+        displayName: 'Device-Tree Build Test'
+      - task: CopyFiles@2
+        inputs:
+          sourceFolder: '$(Agent.BuildDirectory)/s/arch/arm/boot/dts'
+          contents: '$(Agent.BuildDirectory)/s/arch/arm/boot/dts/?(*.dtb)'
+          targetFolder: '$(Build.ArtifactStagingDirectory)'
+      - task: CopyFiles@2
+        inputs:
+          sourceFolder: '$(Agent.BuildDirectory)/s/arch/arm64/boot/dts/xilinx'
+          contents: '$(Agent.BuildDirectory)/s/arch/arm64/boot/dts/xilinx/?(*.dtb)'
+          targetFolder: '$(Build.ArtifactStagingDirectory)'
+      - task: CopyFiles@2
+        inputs:
+          sourceFolder: '$(Agent.BuildDirectory)/s/arch/microblaze/boot'
+          contents: '$(Agent.BuildDirectory)/s/arch/microblaze/boot/(simpleImage.)?(*.strip)'
+          targetFolder: '$(Build.ArtifactStagingDirectory)'
+      - task: PublishPipelineArtifact@1
+        inputs:
+          targetPath: '$(Build.ArtifactStagingDirectory)'
+          artifactName: 'DTBs'
+
+    # - job: BuildDockerized
+    #   strategy:
+    #     matrix:
+    #       zynq_adi_default:
+    #         DEFCONFIG: zynq_xcomm_adv7511_defconfig
+    #         ARCH: arm
+    #         IMAGE: uImage
+    #         CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT: 1
+    #       socfpga_adi_default:
+    #         DEFCONFIG: socfpga_adi_defconfig
+    #         ARCH: arm
+    #         IMAGE: zImage
+    #         CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT: 1
+    #       zynqmp_adi_default:
+    #         DEFCONFIG: adi_zynqmp_defconfig
+    #         ARCH: arm64
+    #         IMAGE: Image
+    #         CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT: 1
+    #       versal_adi_default:
+    #         DEFCONFIG: adi_versal_defconfig
+    #         ARCH: arm64
+    #         IMAGE: Image
+    #         CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT: 1
+    #       zynq_pluto:
+    #         DEFCONFIG: zynq_pluto_defconfig
+    #         ARCH: arm
+    #         IMAGE: uImage
+    #       zynq_m2k:
+    #         DEFCONFIG: zynq_m2k_defconfig
+    #         ARCH: arm
+    #         IMAGE: uImage
+    #   steps:
+    #   - checkout: self
+    #     fetchDepth: 1
+    #     clean: true
+    #   - script: ./ci/travis/run-build-docker.sh
+    #     displayName: "Build test for '$(DEFCONFIG)'"
+    #   - task: CopyFiles@2
+    #     inputs:
+    #       sourceFolder: '$(Agent.BuildDirectory)/s/arch/arm/boot'
+    #       contents: '$(Agent.BuildDirectory)/s/arch/arm/boot/[uz]Image'
+    #       targetFolder: '$(Build.ArtifactStagingDirectory)/$(DEFCONFIG)'
+    #   - task: CopyFiles@2
+    #     inputs:
+    #       sourceFolder: '$(Agent.BuildDirectory)/s/arch/arm/boot'
+    #       contents: '$(Agent.BuildDirectory)/s/arch/arm64/boot/Image'
+    #       targetFolder: '$(Build.ArtifactStagingDirectory)'
+    #   - task: PublishPipelineArtifact@1
+    #     inputs:
+    #       targetPath: '$(Build.ArtifactStagingDirectory)'
+    #       artifactName: 'Kernels_$(DEFCONFIG)'
+
+  - stage: PushArtifacts
+    dependsOn: Build
+    variables:
+      SOURCE_DIRECTORY: $(Build.SourcesDirectory)/bin
+    jobs:
+    - job: Push_to_Artifactory
+      condition: or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+            eq(variables['Build.SourceBranch'], 'refs/heads/next_stable'),
+            eq(variables['Build.SourceBranch'], 'refs/heads/202[0-9]R[0-9]')
+          )
+      pool:
+        vmImage: 'ubuntu-latest'
+      steps:
+        - task: DownloadPipelineArtifact@2
+          inputs:
+            path: $(Build.SourcesDirectory)/bin
+        - bash: ./ci/travis/prepare_artifacts_non_rpi.sh
+          env:
+            ARTIFACTORY_PATH: $(ART_BASE_PATH)
+            ARTIFACTORY_TOKEN: $(ART_TOKEN)
+          displayName: "Push to Artifactory"
+  - stage: TestHarness
+    dependsOn: PushArtifacts
+    jobs:
+    - job: Test
+      steps:
       - checkout: none
       - script: |
-          echo $(JENKINS_URL)
-          echo $(JENKINS_PASSWORD)
-          echo $(isMain)
           curl $(JENKINS_URL)/job/test/buildWithParameters \
             --user $(JENKINS_USER):$(JENKINS_PASSWORD) \
             --data ART_URL="https://google.com" \
             --data COMMIT_SHA=$(Build.SourceVersion)
-# - job: sync_branches_with_main
-#   condition: and(ne(variables['Build.Reason'], 'PullRequest'), eq(variables.isMain, true))
-#   variables:
-#     BUILD_TYPE: sync_branches_with_main
-#     MAIN_BRANCH: $[ variables['Build.SourceBranchName'] ]
-#     CI: true
-#   steps:
-#   - checkout: self
-#     fetchDepth: 50
-#     clean: true
-#     persistCredentials: true
-#   - script: ./ci/travis/run-build.sh
-#     displayName: 'Sync Branches With Main Branch'
 
-# - job: checkpatch
-#   condition: eq(variables['Build.Reason'], 'PullRequest')
-#   variables:
-#     BUILD_TYPE: checkpatch
-#     TARGET_BRANCH: $[ variables['System.PullRequest.TargetBranch'] ]
-#     COMMIT: $[ variables['Build.SourceVersion'] ]
-#     REPO_URL: $[ variables['Build.Repository.Uri'] ]
-#   steps:
-#   - checkout: none
-#   - script: |
-#       set -ex
-#       git init
-#       git remote add origin ${REPO_URL}
-#       git fetch --filter=tree:0 --no-tags origin ${COMMIT}
-#       git checkout --progress --force ${COMMIT}
-#       ./ci/travis/run-build.sh
-#     displayName: 'Checkpatch Script'
-
-# - job: dt_binding_check
-#   condition: eq(variables['Build.Reason'], 'PullRequest')
-#   variables:
-#     BUILD_TYPE: dt_binding_check
-#     TARGET_BRANCH: $[ variables['System.PullRequest.TargetBranch'] ]
-#     COMMIT: $[ variables['Build.SourceVersion'] ]
-#     REPO_URL: $[ variables['Build.Repository.Uri'] ]
-#     UPSTREAM_REPO_URL: https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
-#     UPSTREAM_REPO_BRANCH: dt/next
-#   steps:
-#   - checkout: none
-#   - script: |
-#       set -ex
-
-#       git init
-#       git remote add origin ${REPO_URL}
-#       git fetch  --progress --filter=tree:0 --no-tags origin ${COMMIT}
-
-#       git remote add upstream ${UPSTREAM_REPO_URL}
-#       git fetch --progress --depth=1 upstream ${UPSTREAM_REPO_BRANCH}
-#       git checkout --progress --force FETCH_HEAD
-
-#       git checkout ${COMMIT} -- ci/travis/
-
-#       ./ci/travis/run-build.sh
-#     displayName: 'Bindings Check Script'
-
-# - job: check_new_file_license
-#   condition: eq(variables['Build.Reason'], 'PullRequest')
-#   variables:
-#     BUILD_TYPE: check_new_file_license
-#     TARGET_BRANCH: $[ variables['System.PullRequest.TargetBranch'] ]
-#   steps:
-#   - checkout: self
-#     fetchDepth: 50
-#     clean: true
-#   - script: ./ci/travis/run-build.sh
-#     displayName: 'Check Is New ADI Driver & Dual Licensed'
-
-# - job: dtb_build_test
-#   variables:
-#     BUILD_TYPE: dtb_build_test
-#     DTS_FILES: "arch/arm/boot/dts/zynq-*.dts
-#                 arch/arm/boot/dts/socfpga_*.dts
-#                 arch/arm64/boot/dts/xilinx/zynqmp-*.dts
-#                 arch/arm64/boot/dts/xilinx/versal-*.dts
-#                 arch/microblaze/boot/dts/*.dts
-#                 arch/nios2/boot/dts/*.dts"
-#   steps:
-#   - checkout: self
-#     fetchDepth: 1
-#     clean: true
-#   - script: ./ci/travis/run-build.sh
-#     displayName: 'Device-Tree Build Test'
-
-# - job: BuildDockerized
-#   strategy:
-#     matrix:
-#       zynq_adi_default:
-#         DEFCONFIG: zynq_xcomm_adv7511_defconfig
-#         ARCH: arm
-#         IMAGE: uImage
-#         CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT: 1
-#       socfpga_adi_default:
-#         DEFCONFIG: socfpga_adi_defconfig
-#         ARCH: arm
-#         IMAGE: zImage
-#         CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT: 1
-#       zynqmp_adi_default:
-#         DEFCONFIG: adi_zynqmp_defconfig
-#         ARCH: arm64
-#         IMAGE: Image
-#         CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT: 1
-#       versal_adi_default:
-#         DEFCONFIG: adi_versal_defconfig
-#         ARCH: arm64
-#         IMAGE: Image
-#         CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT: 1
-#       zynq_pluto:
-#         DEFCONFIG: zynq_pluto_defconfig
-#         ARCH: arm
-#         IMAGE: uImage
-#       zynq_m2k:
-#         DEFCONFIG: zynq_m2k_defconfig
-#         ARCH: arm
-#         IMAGE: uImage
-#   steps:
-#   - checkout: self
-#     fetchDepth: 1
-#     clean: true
-#   - script: ./ci/travis/run-build-docker.sh
-#     displayName: "Build test for '$(DEFCONFIG)'"

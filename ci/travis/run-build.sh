@@ -404,7 +404,17 @@ build_dtb_build_test() {
 			__echo_red "'$file' doesn't contain an 'hdl_project:' tag"
 			err=1
 			hdl_project_tag_err=1
-		fi
+		else
+			hdl_tag=$(grep "hdl_project:" $file | sed -E 's/hdl_project:|<|>|\*| //g')
+			project_found=$(curl -sL \
+				-H "Accept: application/vnd.github+json" \
+				-H "Authorization: Bearer $GIT_TOKEN" \
+				-H "X-GitHub-Api-Version: 2022-11-28" \
+				https://api.github.com/repos/analogdevicesinc/hdl/contents/projects/$hdl_tag | grep -q "404" && echo 1 || echo 0)
+			dts=$(echo $file | awk -F'/' '{print $NF}')
+			echo "$dts $project_found"
+			echo "$dts $project_found" >> result
+
 	done
 
 	if [ "$hdl_project_tag_err" = "1" ] ; then
@@ -443,6 +453,8 @@ build_dtb_build_test() {
 	fi
 
 	return $err
+	echo "##################################"
+	cat result
 }
 
 branch_contains_commit() {

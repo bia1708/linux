@@ -18,18 +18,6 @@ pool:
   vmImage: 'ubuntu-latest'
 
 jobs:
-
-  - job: Test
-    steps:
-      - checkout: none
-      - script: |
-          echo $(JENKINS_URL)
-          echo $(JENKINS_PASSWORD)
-          echo $(isMain)
-          curl $(JENKINS_URL)/job/test/buildWithParameters \
-            --user $(JENKINS_USER):$(JENKINS_PASSWORD) \
-            --data ART_URL="https://google.com" \
-            --data COMMIT_SHA=$(Build.SourceVersion)
 # - job: sync_branches_with_main
 #   condition: and(ne(variables['Build.Reason'], 'PullRequest'), eq(variables.isMain, true))
 #   variables:
@@ -101,21 +89,21 @@ jobs:
 #   - script: ./ci/travis/run-build.sh
 #     displayName: 'Check Is New ADI Driver & Dual Licensed'
 
-# - job: dtb_build_test
-#   variables:
-#     BUILD_TYPE: dtb_build_test
-#     DTS_FILES: "arch/arm/boot/dts/zynq-*.dts
-#                 arch/arm/boot/dts/socfpga_*.dts
-#                 arch/arm64/boot/dts/xilinx/zynqmp-*.dts
-#                 arch/arm64/boot/dts/xilinx/versal-*.dts
-#                 arch/microblaze/boot/dts/*.dts
-#                 arch/nios2/boot/dts/*.dts"
-#   steps:
-#   - checkout: self
-#     fetchDepth: 1
-#     clean: true
-#   - script: ./ci/travis/run-build.sh
-#     displayName: 'Device-Tree Build Test'
+- job: dtb_build_test
+  variables:
+    BUILD_TYPE: dtb_build_test
+    DTS_FILES: "arch/arm/boot/dts/zynq-*.dts
+                arch/arm/boot/dts/socfpga_*.dts
+                arch/arm64/boot/dts/xilinx/zynqmp-*.dts
+                arch/arm64/boot/dts/xilinx/versal-*.dts
+                arch/microblaze/boot/dts/*.dts
+                arch/nios2/boot/dts/*.dts"
+  steps:
+  - checkout: self
+    fetchDepth: 1
+    clean: true
+  - script: ./ci/travis/run-build.sh
+    displayName: 'Device-Tree Build Test'
 
 # - job: BuildDockerized
 #   strategy:
@@ -148,9 +136,18 @@ jobs:
 #         DEFCONFIG: zynq_m2k_defconfig
 #         ARCH: arm
 #         IMAGE: uImage
-#   steps:
-#   - checkout: self
-#     fetchDepth: 1
-#     clean: true
-#   - script: ./ci/travis/run-build-docker.sh
-#     displayName: "Build test for '$(DEFCONFIG)'"
+  # steps:
+  # - checkout: self
+  #   fetchDepth: 1
+  #   clean: true
+  # - script: ./ci/travis/run-build-docker.sh
+  #   displayName: "Build test for '$(DEFCONFIG)'"
+
+- job: Test
+  steps:
+  - checkout: none
+  - script: |
+      curl $(JENKINS_URL)/job/test/buildWithParameters \
+        --user $(JENKINS_USER):$(JENKINS_PASSWORD) \
+        --data ART_URL="https://google.com" \
+        --data COMMIT_SHA=$(Build.SourceVersion)

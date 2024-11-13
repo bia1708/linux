@@ -15,7 +15,8 @@ pr:
 - 20*
 
 pool:
-  vmImage: 'ubuntu-latest'
+  name: Default
+  # vmImage: 'ubuntu-latest'
 
 stages:
   - stage: Build
@@ -91,16 +92,45 @@ stages:
   #   - script: ./ci/travis/run-build.sh
   #     displayName: 'Check Is New ADI Driver & Dual Licensed'
 
+    - job: microblaze_build_test
+      variables:
+        BUILD_TYPE: microblaze
+        DTS_FILES: "arch/microblaze/boot/dts/*.dts"
+      steps:
+        - checkout: self
+          fetchDepth: 1
+          clean: true
+        - task: DownloadPipelineArtifact@2
+          inputs:
+            buildType: 'specific'
+            project: 'CIs'
+            definition: 2            # The ID of the pipeline you want to download artifacts from
+            buildVersionToDownload: 'latest'
+            artifactName: 'mb_rootfs'
+            targetPath: '$(Agent.BuildDirectory)/s'
+        - script: ./ci/travis/run-build.sh
+          env:
+            ARTIFACTORY_PATH: $(ART_BASE_PATH)
+            ARTIFACTORY_TOKEN: $(ART_TOKEN)
+          displayName: 'Microblaze Build Test'
+        - task: CopyFiles@2
+          inputs:
+            sourceFolder: '$(Agent.BuildDirectory)/s/arch/microblaze/boot'
+            contents: '?(*.strip)'
+            targetFolder: '$(Build.ArtifactStagingDirectory)'
+        - task: PublishPipelineArtifact@1
+          inputs:
+            targetPath: '$(Build.ArtifactStagingDirectory)'
+            artifactName: 'Microblaze'
+
     - job: dtb_build_test
       variables:
         BUILD_TYPE: dtb_build_test
-        DTS_FILES: "arch/arm64/boot/dts/xilinx/versal-*.dts"
-                    # "arch/arm/boot/dts/zynq-*.dts
-                    # arch/arm/boot/dts/socfpga_*.dts
-                    # arch/arm64/boot/dts/xilinx/zynqmp-*.dts
-                    # arch/arm64/boot/dts/xilinx/versal-*.dts
-                    # arch/microblaze/boot/dts/*.dts
-                    # arch/nios2/boot/dts/*.dts"
+        DTS_FILES: "arch/arm64/boot/dts/xilinx/versal-*.dts
+                    arch/arm/boot/dts/zynq-*.dts
+                    arch/arm/boot/dts/socfpga_*.dts
+                    arch/arm64/boot/dts/xilinx/zynqmp-*.dts
+                    arch/nios2/boot/dts/*.dts"
       steps:
       - checkout: self
         fetchDepth: 1
@@ -117,67 +147,62 @@ stages:
           sourceFolder: '$(Agent.BuildDirectory)/s/arch/arm64/boot/dts/xilinx'
           contents: '$(Agent.BuildDirectory)/s/arch/arm64/boot/dts/xilinx/?(*.dtb)'
           targetFolder: '$(Build.ArtifactStagingDirectory)'
-      - task: CopyFiles@2
-        inputs:
-          sourceFolder: '$(Agent.BuildDirectory)/s/arch/microblaze/boot'
-          contents: '$(Agent.BuildDirectory)/s/arch/microblaze/boot/(simpleImage.)?(*.strip)'
-          targetFolder: '$(Build.ArtifactStagingDirectory)'
       - task: PublishPipelineArtifact@1
         inputs:
           targetPath: '$(Build.ArtifactStagingDirectory)'
           artifactName: 'DTBs'
 
-    # - job: BuildDockerized
-    #   strategy:
-    #     matrix:
-    #       zynq_adi_default:
-    #         DEFCONFIG: zynq_xcomm_adv7511_defconfig
-    #         ARCH: arm
-    #         IMAGE: uImage
-    #         CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT: 1
-    #       socfpga_adi_default:
-    #         DEFCONFIG: socfpga_adi_defconfig
-    #         ARCH: arm
-    #         IMAGE: zImage
-    #         CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT: 1
-    #       zynqmp_adi_default:
-    #         DEFCONFIG: adi_zynqmp_defconfig
-    #         ARCH: arm64
-    #         IMAGE: Image
-    #         CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT: 1
-    #       versal_adi_default:
-    #         DEFCONFIG: adi_versal_defconfig
-    #         ARCH: arm64
-    #         IMAGE: Image
-    #         CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT: 1
-    #       zynq_pluto:
-    #         DEFCONFIG: zynq_pluto_defconfig
-    #         ARCH: arm
-    #         IMAGE: uImage
-    #       zynq_m2k:
-    #         DEFCONFIG: zynq_m2k_defconfig
-    #         ARCH: arm
-    #         IMAGE: uImage
-    #   steps:
-    #   - checkout: self
-    #     fetchDepth: 1
-    #     clean: true
-    #   - script: ./ci/travis/run-build-docker.sh
-    #     displayName: "Build test for '$(DEFCONFIG)'"
-    #   - task: CopyFiles@2
-    #     inputs:
-    #       sourceFolder: '$(Agent.BuildDirectory)/s/arch/arm/boot'
-    #       contents: '$(Agent.BuildDirectory)/s/arch/arm/boot/[uz]Image'
-    #       targetFolder: '$(Build.ArtifactStagingDirectory)/$(DEFCONFIG)'
-    #   - task: CopyFiles@2
-    #     inputs:
-    #       sourceFolder: '$(Agent.BuildDirectory)/s/arch/arm/boot'
-    #       contents: '$(Agent.BuildDirectory)/s/arch/arm64/boot/Image'
-    #       targetFolder: '$(Build.ArtifactStagingDirectory)'
-    #   - task: PublishPipelineArtifact@1
-    #     inputs:
-    #       targetPath: '$(Build.ArtifactStagingDirectory)'
-    #       artifactName: 'Kernels_$(DEFCONFIG)'
+    - job: BuildDockerized
+      strategy:
+        matrix:
+          zynq_adi_default:
+            DEFCONFIG: zynq_xcomm_adv7511_defconfig
+            ARCH: arm
+            IMAGE: uImage
+            CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT: 1
+          socfpga_adi_default:
+            DEFCONFIG: socfpga_adi_defconfig
+            ARCH: arm
+            IMAGE: zImage
+            CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT: 1
+          zynqmp_adi_default:
+            DEFCONFIG: adi_zynqmp_defconfig
+            ARCH: arm64
+            IMAGE: Image
+            CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT: 1
+          versal_adi_default:
+            DEFCONFIG: adi_versal_defconfig
+            ARCH: arm64
+            IMAGE: Image
+            CHECK_ALL_ADI_DRIVERS_HAVE_BEEN_BUILT: 1
+          zynq_pluto:
+            DEFCONFIG: zynq_pluto_defconfig
+            ARCH: arm
+            IMAGE: uImage
+          zynq_m2k:
+            DEFCONFIG: zynq_m2k_defconfig
+            ARCH: arm
+            IMAGE: uImage
+      steps:
+      - checkout: self
+        fetchDepth: 1
+        clean: true
+      - script: ./ci/travis/run-build-docker.sh
+        displayName: "Build test for '$(DEFCONFIG)'"
+      - task: CopyFiles@2
+        inputs:
+          sourceFolder: '$(Agent.BuildDirectory)/s/arch/arm/boot'
+          contents: '[uz]Image'
+          targetFolder: '$(Build.ArtifactStagingDirectory)'
+      - task: CopyFiles@2
+        inputs:
+          sourceFolder: '$(Agent.BuildDirectory)/s/arch/arm64/boot'
+          contents: 'Image'
+          targetFolder: '$(Build.ArtifactStagingDirectory)'
+      - task: PublishPipelineArtifact@1
+        inputs:
+          targetPath: '$(Build.ArtifactStagingDirectory)/'
+          artifactName: '$(DEFCONFIG)'
 
   - stage: PushArtifacts
     dependsOn: Build
@@ -191,7 +216,8 @@ stages:
             eq(variables['Build.SourceBranch'], 'refs/heads/202[0-9]R[0-9]')
           )
       pool:
-        vmImage: 'ubuntu-latest'
+        name: Default
+        # vmImage: 'ubuntu-latest'
       steps:
         - task: DownloadPipelineArtifact@2
           inputs:
@@ -200,17 +226,25 @@ stages:
           env:
             ARTIFACTORY_PATH: $(ART_BASE_PATH)
             ARTIFACTORY_TOKEN: $(ART_TOKEN)
+          name: PushArtifacts
           displayName: "Push to Artifactory"
+
   - stage: TestHarness
     dependsOn: PushArtifacts
-    condition: succeeded('PushArtifacts')
+    condition: succeeded()
     jobs:
     - job: Test
+      variables:
+        TIMESTAMP: $[ stageDependencies.PushArtifacts.Push_to_Artifactory.outputs['PushArtifacts.TIMESTAMP'] ]
+        BRANCH: $[ stageDependencies.PushArtifacts.Push_to_Artifactory.outputs['PushArtifacts.BRANCH'] ]
+        PR_ID: $[ stageDependencies.PushArtifacts.Push_to_Artifactory.outputs['PushArtifacts.PR_ID] ]
       steps:
       - checkout: none
       - script: |
-          curl $(JENKINS_URL)/job/test/buildWithParameters \
+          echo $(TIMESTAMP)
+          curl $(JENKINS_URL)/job/Linux_TH/buildWithParameters \
             --user $(JENKINS_USER):$(JENKINS_PASSWORD) \
-            --data ART_URL="https://google.com" \
+            --data TIMESTAMP=$(TIMESTAMP) \
+            --data BRANCH=$(BRANCH) \
             --data COMMIT_SHA=$(Build.SourceVersion)
-
+            --data PR_ID=$(PR_ID)

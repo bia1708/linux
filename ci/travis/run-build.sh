@@ -84,6 +84,13 @@ if [ "$ARCH" = "arm" ] ; then
 	APT_LIST="$APT_LIST gcc-arm-linux-gnueabi"
 fi
 
+if [ "$ARCH" = "microblaze" ] ; then
+	if [ -z "$CROSS_COMPILE" ] ; then
+		CROSS_COMPILE=microblaze-xilinx-elf-
+		export CROSS_COMPILE
+	fi
+fi
+
 apt_update_install() {
 	apt_install $@
 	adjust_kcflags_against_gcc
@@ -383,10 +390,64 @@ build_dt_binding_check() {
 	return $err
 }
 
+build_microblaze() {
+	local exceptions_file="ci/travis/dtb_build_test_exceptions"
+	local err=0
+
+	wget --auth-no-challenge --user=bpopu --password=${ARTIFACTORY_TOKEN} "${ARTIFACTORY_PATH}/test_upload/microblazeel-xilinx-elf.tar.gz"
+	tar -xvzf microblazeel-xilinx-elf.tar.gz -C /usr/bin
+
+	# for file in $DTS_FILES; do
+	# 	if __exceptions_file "$exceptions_file" "$file"; then
+	# 		continue
+	# 	fi
+
+	# 	if ! grep -q "hdl_project:" $file ; then
+	# 		__echo_red "'$file' doesn't contain an 'hdl_project:' tag"
+	# 		err=1
+	# 		hdl_project_tag_err=1
+	# 	fi
+	# done
+
+	# if [ "$hdl_project_tag_err" = "1" ] ; then
+	# 	echo
+	# 	echo
+	# 	__echo_green "Some DTs have been found that do not contain an 'hdl_project:' tag"
+	# 	__echo_green "   Either:"
+	# 	__echo_green "     1. Create a 'hdl_project' tag for it"
+	# 	__echo_green "     OR"
+	# 	__echo_green "     1. add it in file '$exceptions_file'"
+	# 	return 1
+	# fi
+
+	ARCH=microblaze make adi_mb_defconfig
+	for file in $DTS_FILES; do
+		if __exceptions_file "$exceptions_file" "$file"; then
+			continue
+		fi
+
+		dtb_file="simpleImage."
+		dtb_file+=$(echo $file | sed 's/dts\//=/g' | cut -d'=' -f2 | sed 's\.dts\\g')
+		export CROSS_COMPILE=microblaze-xilinx-elf-
+
+		echo "######################################"
+		echo $ARCH $dtb_file $defconfig $CROSS_COMPILE
+		ARCH=microblaze make ${dtb_file} -j$NUM_JOBS || err=1
+	done
+
+	if [ "$err" = "0" ] ; then
+		__echo_green "DTB build tests passed"
+		return 0
+	fi
+
+	return $err
+}
+
 build_dtb_build_test() {
 	local exceptions_file="ci/travis/dtb_build_test_exceptions"
 	local err=0
-	local last_arch
+	local defconfig
+	local last_defconfig
 
 	for file in $DTS_FILES; do
 		arch=$(echo $file |  cut -d'/' -f2)
@@ -425,9 +486,29 @@ build_dtb_build_test() {
 
 		dtb_file=$(echo $file | sed 's/dts\//=/g' | cut -d'=' -f2 | sed 's\dts\dtb\g')
 		arch=$(echo $file |  cut -d'/' -f2)
-		if [ "$last_arch" != "$arch" ] ; then
-			ARCH=$arch make defconfig
-			last_arch=$arch
+
+		case "$(echo ${file} | grep -Eo 'zynq|zynqmp|socfpga|versal' || echo '')" in
+			zynq)
+				defconfig="zynq_xcomm_adv7511_defconfig"
+				;;
+			zynqmp)
+				defconfig="adi_zynqmp_defconfig"
+				;;
+			socfpga)
+				defconfig="socfpga_adi_defconfig"
+				;;
+			versal)
+				defconfig="adi_versal_defconfig"
+				;;
+			*)
+				echo "Default defconfig will be used."
+				defconfig="defconfig"
+				;;
+		esac
+
+		if [ "$last_defconfig" != "$defconfig" ] ; then
+			ARCH=$arch make ${defconfig}
+			last_defconfig=$defconfig
 		fi
 		# XXX: hack for nios2, which doesn't have `arch/nios2/boot/dts/Makefile`
 		# but even an empty one is fine

@@ -22,7 +22,7 @@ from glob import glob
 
 LOCAL_PATHS_LIST = []
 # If you try to upload files in a different folder than the ones in below list, there will be printed a message and files won't be uploaded
-SERVER_FOLDERS_LIST = [ "hdl", "linux", "linux_rpi", "arm_trusted_firmware", "boot_partition", "rootfs", "u-boot", "HighSpeedConverterToolbox", "TransceiverToolbox", "SD_card_image"]
+SERVER_FOLDERS_LIST = [ "test_upload", "hdl", "linux", "linux_rpi", "arm_trusted_firmware", "boot_partition", "rootfs", "u-boot", "HighSpeedConverterToolbox", "TransceiverToolbox", "SD_card_image"]
 
 ########### Define arguments and help section #################
 

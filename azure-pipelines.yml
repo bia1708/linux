@@ -203,9 +203,9 @@ stages:
           displayName: "Push to Artifactory"
   - stage: TestHarness
     dependsOn: PushArtifacts
-    condition: succeeded('PushArtifacts')
     jobs:
     - job: Test
+      condition: succeeded('PushArtifacts')
       steps:
       - checkout: none
       - script: |

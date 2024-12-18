@@ -205,16 +205,26 @@ stages:
           artifactName: '$(DEFCONFIG)'
 
   - stage: PushArtifacts
-    dependsOn: Build
+    # dependsOn: Build
     variables:
       SOURCE_DIRECTORY: $(Build.SourcesDirectory)/bin
     jobs:
     - job: Push_to_Artifactory
       condition: or(
-          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          and(
+            startsWith(variables['Build.SourceBranch'], 'refs/pull/'),
+            or(
+              eq(variables['System.PullRequest.TargetBranch'], 'main'),
+              eq(variables['System.PullRequest.TargetBranch'], 'next_stable'),
+              startsWith(variables['System.PullRequest.TargetBranch'], '202')
+            )
+          ),
+          or(
+            eq(variables['Build.SourceBranch'], 'refs/heads/main'),
             eq(variables['Build.SourceBranch'], 'refs/heads/next_stable'),
-            eq(variables['Build.SourceBranch'], 'refs/heads/202[0-9]R[0-9]')
+            startsWith(variables['Build.SourceBranch'], 'refs/heads/202')
           )
+        )
       pool:
         name: Default
         # vmImage: 'ubuntu-latest'
@@ -234,17 +244,16 @@ stages:
     condition: succeeded()
     jobs:
     - job: Test
+      condition: ne(stageDependencies.PushArtifacts.Push_to_Artifactory.result, 'Skipped')
       variables:
         TIMESTAMP: $[ stageDependencies.PushArtifacts.Push_to_Artifactory.outputs['PushArtifacts.TIMESTAMP'] ]
         BRANCH: $[ stageDependencies.PushArtifacts.Push_to_Artifactory.outputs['PushArtifacts.BRANCH'] ]
-        PR_ID: $[ stageDependencies.PushArtifacts.Push_to_Artifactory.outputs['PushArtifacts.PR_ID] ]
+        PR_ID: $[ stageDependencies.PushArtifacts.Push_to_Artifactory.outputs['PushArtifacts.PR_ID'] ]
       steps:
       - checkout: none
       - script: |
-          echo $(TIMESTAMP)
           curl $(JENKINS_URL)/job/Linux_TH/buildWithParameters \
             --user $(JENKINS_USER):$(JENKINS_PASSWORD) \
             --data TIMESTAMP=$(TIMESTAMP) \
             --data BRANCH=$(BRANCH) \
-            --data COMMIT_SHA=$(Build.SourceVersion)
             --data PR_ID=$(PR_ID)

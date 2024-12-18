@@ -394,31 +394,30 @@ build_microblaze() {
 	local exceptions_file="ci/travis/dtb_build_test_exceptions"
 	local err=0
 
-	wget --auth-no-challenge --user=bpopu --password=${ARTIFACTORY_TOKEN} "${ARTIFACTORY_PATH}/test_upload/microblazeel-xilinx-elf.tar.gz"
+	wget --auth-no-challenge -q --show-progress "${ARTIFACTORY_PATH}/microblaze_compiler/microblazeel-xilinx-elf.tar.gz"
 	tar -xvzf microblazeel-xilinx-elf.tar.gz -C /usr/bin
 
-	# for file in $DTS_FILES; do
-	# 	if __exceptions_file "$exceptions_file" "$file"; then
-	# 		continue
-	# 	fi
+	for file in $DTS_FILES; do
+		if __exceptions_file "$exceptions_file" "$file"; then
+			continue
+		fi
 
-	# 	if ! grep -q "hdl_project:" $file ; then
-	# 		__echo_red "'$file' doesn't contain an 'hdl_project:' tag"
-	# 		err=1
-	# 		hdl_project_tag_err=1
-	# 	fi
-	# done
+		if ! grep -q "hdl_project:" $file ; then
+			__echo_red "'$file' doesn't contain an 'hdl_project:' tag"
+			err=1
+			hdl_project_tag_err=1
+		fi
+	done
 
-	# if [ "$hdl_project_tag_err" = "1" ] ; then
-	# 	echo
-	# 	echo
-	# 	__echo_green "Some DTs have been found that do not contain an 'hdl_project:' tag"
-	# 	__echo_green "   Either:"
-	# 	__echo_green "     1. Create a 'hdl_project' tag for it"
-	# 	__echo_green "     OR"
-	# 	__echo_green "     1. add it in file '$exceptions_file'"
-	# 	return 1
-	# fi
+	if [ "$hdl_project_tag_err" = "1" ] ; then
+		echo
+		echo
+		__echo_green "Some DTs have been found that do not contain an 'hdl_project:' tag"
+		__echo_green "   Either:"
+		__echo_green "     1. Create a 'hdl_project' tag for it"
+		__echo_green "     OR"
+		__echo_green "     1. add it in file '$exceptions_file'"
+	fi
 
 	ARCH=microblaze make adi_mb_defconfig
 	for file in $DTS_FILES; do

@@ -2,17 +2,35 @@
 #!/bin/bash -e
 
 TIMESTAMP=$(date +%Y_%m_%d-%H_%M)
-GIT_SHA=$(git rev-parse --short HEAD)
-GIT_SHA_DATE=$(git show -s --format=%cd --date=format:'%Y-%m-%d %H:%M' ${GIT_SHA} | sed -e "s/ \|\:/-/g")
-BRANCH_NAME="$(echo $BUILD_SOURCEBRANCH | awk -F'/' '{print $NF}')"
-SERVER_PATH=""
+# For PRs, Azure makes a merge commit (HEAD) because of the shallow copy option
+# (which we want). So, GIT_SHA in this case is the actual correct commit inside
+# the PR, and MERGE_COMMIT is the commit made by Azure (which we extract the date
+# from)
+if [[ -n "$SYSTEM_PULLREQUEST_SOURCECOMMITID" ]]; then
+    GIT_SHA=$SYSTEM_PULLREQUEST_SOURCECOMMITID
+else
+    GIT_SHA=$BUILD_SOURCEVERSION
+fi
+MERGE_COMMIT_SHA=$(git rev-parse --short HEAD)
+GIT_SHA_DATE=$(git show -s --format=%cd --date=format:'%Y-%m-%d %H:%M' ${MERGE_COMMIT_SHA} | sed -e "s/ \|\:/-/g")
+SERVER_PATH="test_upload/linux/"
+if [ -n $SYSTEM_PULLREQUEST_TARGETBRANCH ]; then
+    BRANCH_NAME="$SYSTEM_PULLREQUEST_TARGETBRANCH"
+    SERVER_PATH+="PRs/"
+else
+    BRANCH_NAME="$(echo $BUILD_SOURCEBRANCH | awk -F'/' '{print $NF}')"
+fi
 
 set_artifactory_path() {
-	if [ "$BRANCH_NAME" == "main" ]; then
-		SERVER_PATH="test_upload/linux/main"
-	else
-		SERVER_PATH="test_upload/linux/releases/$BRANCH_NAME"
-	fi
+    if [ -n $SYSTEM_PULLREQUEST_TARGETBRANCH ]; then
+        SERVER_PATH+="$BRANCH_NAME/pr_$SYSTEM_PULLREQUEST_PULLREQUESTNUMBER"
+    else
+        if [ "$BRANCH_NAME" == "main" ]; then
+            SERVER_PATH+="main"
+        else
+            SERVER_PATH+="releases/$BRANCH_NAME"
+        fi
+    fi
 }
 
 create_extlinux() {
@@ -90,13 +108,13 @@ python3 ../ci/travis/upload_to_artifactory.py \
         --server_path="${SERVER_PATH}" \
         --local_path="${TIMESTAMP}" \
         --props_level="2" \
-        --properties="git_sha=${BUILD_SOURCEVERSION};commit_date=${TIMESTAMP}" \
+        --properties="git_sha=${GIT_SHA};commit_date=${TIMESTAMP}" \
         --token="${ARTIFACTORY_TOKEN}"
 
 echo "##vso[task.setvariable variable=TIMESTAMP;isOutput=true]${TIMESTAMP}"
 echo "##vso[task.setvariable variable=BRANCH;isOutput=true]${BRANCH_NAME}"
-if [ -n "$(System.PullRequest.PullRequestId)" ]; then
-    echo "##vso[task.setvariable variable=PR_ID]$(System.PullRequest.PullRequestId)"
+if [ -n $SYSTEM_PULLREQUEST_PULLREQUESTNUMBER ]; then
+    echo "##vso[task.setvariable variable=PR_ID;isOutput=true]$SYSTEM_PULLREQUEST_PULLREQUESTNUMBER"
 else
-    echo "##vso[task.setvariable variable=PR_ID]commit"
+    echo "##vso[task.setvariable variable=PR_ID;isOutput=true]commit"
 fi

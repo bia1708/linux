@@ -4,15 +4,24 @@
 TIMESTAMP=$(date +%Y_%m_%d-%H_%M)
 GIT_SHA=$(git rev-parse --short HEAD)
 GIT_SHA_DATE=$(git show -s --format=%cd --date=format:'%Y-%m-%d %H:%M' ${GIT_SHA} | sed -e "s/ \|\:/-/g")
-BRANCH_NAME="$(echo $BUILD_SOURCEBRANCH | awk -F'/' '{print $NF}')"
-SERVER_PATH=""
+SERVER_PATH="test_upload/linux/"
+if [ -n $SYSTEM_PULLREQUEST_TARGETBRANCH ]; then
+    BRANCH_NAME="$SYSTEM_PULLREQUEST_TARGETBRANCH"
+    SERVER_PATH+="PRs/"
+else
+    BRANCH_NAME="$(echo $BUILD_SOURCEBRANCH | awk -F'/' '{print $NF}')"
+fi
 
 set_artifactory_path() {
-	if [ "$BRANCH_NAME" == "main" ]; then
-		SERVER_PATH="test_upload/linux/main"
-	else
-		SERVER_PATH="test_upload/linux/releases/$BRANCH_NAME"
-	fi
+    if [ -n $SYSTEM_PULLREQUEST_TARGETBRANCH ]; then
+        SERVER_PATH+="$BRANCH_NAME/pr_$SYSTEM_PULLREQUEST_PULLREQUESTNUMBER"
+    else
+        if [ "$BRANCH_NAME" == "main" ]; then
+            SERVER_PATH+="main"
+        else
+            SERVER_PATH+="releases/$BRANCH_NAME"
+        fi
+    fi
 }
 
 create_extlinux() {
@@ -95,8 +104,8 @@ python3 ../ci/travis/upload_to_artifactory.py \
 
 echo "##vso[task.setvariable variable=TIMESTAMP;isOutput=true]${TIMESTAMP}"
 echo "##vso[task.setvariable variable=BRANCH;isOutput=true]${BRANCH_NAME}"
-if [ -n "$(System.PullRequest.PullRequestId)" ]; then
-    echo "##vso[task.setvariable variable=PR_ID]$(System.PullRequest.PullRequestId)"
+if [ -n $SYSTEM_PULLREQUEST_PULLREQUESTNUMBER ]; then
+    echo "##vso[task.setvariable variable=PR_ID;isOutput=true]$SYSTEM_PULLREQUEST_PULLREQUESTNUMBER"
 else
-    echo "##vso[task.setvariable variable=PR_ID]commit"
+    echo "##vso[task.setvariable variable=PR_ID;isOutput=true]commit"
 fi

@@ -393,7 +393,7 @@ build_microblaze() {
 	local err=0
 
 	# Setup standalone compiler
-	wget -q --show-progress "${DOWNLOAD_URL}/microblaze_compiler/microblazeel-xilinx-elf.tar.gz"
+	wget --show-progress "${DOWNLOAD_URL}/microblaze_compiler/microblazeel-xilinx-elf.tar.gz"
 	mkdir -p /opt/microblazeel-xilinx-elf
 	tar -xvzf microblazeel-xilinx-elf.tar.gz -C /opt/microblazeel-xilinx-elf
 	export PATH=$PATH:/opt/microblazeel-xilinx-elf/bin

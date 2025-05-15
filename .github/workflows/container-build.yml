@@ -1,0 +1,27 @@
+name: Container Build
+run-name: triggered by ${{ github.actor }}
+on:
+  push:
+    paths:
+      - '.github/workflows/**'
+      - 'ci/**'
+jobs:
+  ContainerBuild:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Build podman container
+        run: podman build --tag adi_container:latest ci/ && podman save -o adi_container.tar localhost/adi_container:latest
+      - name: Build Docker container
+        run: |
+          docker load -i adi_container.tar
+          docker tag localhost/adi_container:latest adi_container:latest
+          echo "FROM adi_container:latest" > Dockerfile
+          docker build -t adi_docker .
+          docker save -o adi_docker.tar adi_docker
+      - name: Publish Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: containers
+          path: ./*.tar

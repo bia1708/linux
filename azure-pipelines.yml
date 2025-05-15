@@ -214,10 +214,10 @@ pool:
 jobs:
 - job: Push_to_Artifactory
   timeoutInMinutes: 90
-  pool:
-    name: Default
-    demands:
-      - agent.name -equals linux_default
+  # pool:
+  #   name: Default
+  #   demands:
+  #     - agent.name -equals linux_default
   condition: or(
       and(
         startsWith(variables['Build.SourceBranch'], 'refs/pull/'),
